@@ -54,7 +54,7 @@
  {
      options.AddPolicy("AllowNetlify", policy =>
      {
-         policy.WithOrigins("https://bookapp-angular20.netlify.app")
+         policy.WithOrigins("https://bookapp2026.netlify.app")
                .AllowAnyMethod()
                .AllowAnyHeader();
      });
