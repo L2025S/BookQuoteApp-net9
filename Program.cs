@@ -1,4 +1,9 @@
 
+
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using System.Text;
 using BookApi.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
