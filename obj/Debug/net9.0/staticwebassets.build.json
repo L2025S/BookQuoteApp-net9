@@ -1,0 +1,12 @@
+{
+  "Version": 1,
+  "Hash": "SFVnIx/QyQZEhrNBSm5uthCza/p6mId7+czidpYh+bk=",
+  "Source": "BookApi",
+  "BasePath": "_content/BookApi",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": [],
+  "Endpoints": []
+}
