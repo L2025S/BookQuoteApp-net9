@@ -7,7 +7,6 @@ using System.Text;
 using BookApi.Data;
 using BookApi.Models;
 using Microsoft.AspNetCore.Mvc;
-// using Microsoft.AspNetCore.RateLimiting;  // COMMENTED OFF: Not needed without rate limiting
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -21,7 +20,6 @@ public class AuthController : ControllerBase
     private readonly AppDbContext _db;
     private readonly IConfiguration _configuration;
 
-    // Dummy hash for non-existent users (BCrypt with work factor 12)
     private const string DummyPasswordHash = "$2a$12$Fg9jQ4ZQ5YxLmNpRtVwYuXeFgHjKlQwErTyUiOpAsDfGhJkLzXcVbNm";
 
     public AuthController(AppDbContext db, IConfiguration configuration)
@@ -30,18 +28,15 @@ public class AuthController : ControllerBase
         _configuration = configuration;
     }
 
-    // [EnableRateLimiting("RegisterPolicy")]  // COMMENTED OFF: Rate limiting disabled
     [HttpPost("register")]
     public IActionResult Register(UserRegisterDto dto)
     {
-        // Generic error for model validation to prevent username enumeration
         if (!ModelState.IsValid)
-            return BadRequest("Unable to register. Please check your input.");
+            return BadRequest(new { message = "Unable to register. Please check your input." });
 
-        // Check for existing username (returns same generic message as other errors)
         if (_db.Users.Any(u => u.Username == dto.Username))
         {
-            return BadRequest("Unable to register. Please check your input.");
+            return BadRequest(new { message = "Unable to register. Please check your input." });
         }
 
         var user = new User
@@ -57,14 +52,14 @@ public class AuthController : ControllerBase
         }
         catch (DbUpdateException)
         {
-            // Catch unique constraint violations (e.g., concurrent registration)
-            return BadRequest("Unable to register. Please check your input.");
+            return BadRequest(new { message = "Unable to register. Please check your input." });
         }
 
-        return Ok("User created successfully.");
+        // FIX: Return JSON instead of plain text so Angular HttpClient can parse it correctly.
+        // Without this, Angular's default JSON parser would throw SyntaxError and enter error callback.
+        return Ok(new { message = "User created successfully." });
     }
 
-    // [EnableRateLimiting("LoginPolicy")]  // COMMENTED OFF: Rate limiting disabled
     [HttpPost("login")]
     public IActionResult Login(UserLoginDto dto)
     {
@@ -75,29 +70,18 @@ public class AuthController : ControllerBase
         string passwordHashToVerify;
 
         if (user != null)
-        {
             passwordHashToVerify = user.PasswordHash;
-        }
         else
-        {
-            // Use constant dummy hash to prevent timing attacks
             passwordHashToVerify = DummyPasswordHash;
-        }
 
         bool isValid = BCrypt.Net.BCrypt.Verify(dto.Password, passwordHashToVerify);
 
         if (!isValid)
-        {
-            return Unauthorized("Invalid username or password.");
-        }
+            return Unauthorized(new { message = "Invalid username or password." });
 
         if (user == null)
-        {
-            // Defensive – never reached because dummy hash fails verification
-            return Unauthorized("Invalid username or password.");
-        }
+            return Unauthorized(new { message = "Invalid username or password." });
 
-        // Generate JWT token
         var jwtSecret = _configuration["JWT_SECRET"];
         if (string.IsNullOrEmpty(jwtSecret))
             throw new Exception("JWT_SECRET is not configured.");
@@ -123,7 +107,7 @@ public class AuthController : ControllerBase
     }
 }
 
-// DTOs remain unchanged
+// DTOs unchanged
 public class UserRegisterDto
 {
     [System.ComponentModel.DataAnnotations.Required]
