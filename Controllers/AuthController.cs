@@ -1,4 +1,5 @@
 
+
 using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
@@ -31,12 +32,20 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     public IActionResult Register(UserRegisterDto dto)
     {
+        // CHANGE 1: Return detailed validation errors instead of a generic message
         if (!ModelState.IsValid)
-            return BadRequest(new { message = "Unable to register. Please check your input." });
+        {
+            // Extract all error messages from ModelState
+            var errors = ModelState.Values
+                .SelectMany(v => v.Errors)
+                .Select(e => e.ErrorMessage)
+                .ToList();
+            return BadRequest(new { message = string.Join("; ", errors), errors });
+        }
 
         if (_db.Users.Any(u => u.Username == dto.Username))
         {
-            return BadRequest(new { message = "Unable to register. Please check your input." });
+            return BadRequest(new { message = "Username already exists." });
         }
 
         var user = new User
@@ -52,11 +61,9 @@ public class AuthController : ControllerBase
         }
         catch (DbUpdateException)
         {
-            return BadRequest(new { message = "Unable to register. Please check your input." });
+            return BadRequest(new { message = "Database error, please try again." });
         }
 
-        // FIX: Return JSON instead of plain text so Angular HttpClient can parse it correctly.
-        // Without this, Angular's default JSON parser would throw SyntaxError and enter error callback.
         return Ok(new { message = "User created successfully." });
     }
 
@@ -107,17 +114,17 @@ public class AuthController : ControllerBase
     }
 }
 
-// DTOs unchanged
+// DTOs with validation attributes (already correct)
 public class UserRegisterDto
 {
-    [System.ComponentModel.DataAnnotations.Required]
-    [System.ComponentModel.DataAnnotations.MinLength(3)]
-    [System.ComponentModel.DataAnnotations.MaxLength(50)]
+    [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Username is required.")]
+    [System.ComponentModel.DataAnnotations.MinLength(3, ErrorMessage = "Username must be at least 3 characters.")]
+    [System.ComponentModel.DataAnnotations.MaxLength(50, ErrorMessage = "Username cannot exceed 50 characters.")]
     public string Username { get; set; } = "";
 
-    [System.ComponentModel.DataAnnotations.Required]
-    [System.ComponentModel.DataAnnotations.MinLength(8)]
-    [System.ComponentModel.DataAnnotations.MaxLength(100)]
+    [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Password is required.")]
+    [System.ComponentModel.DataAnnotations.MinLength(8, ErrorMessage = "Password must be between 8 and 100 characters.")]
+    [System.ComponentModel.DataAnnotations.MaxLength(100, ErrorMessage = "Password cannot exceed 100 characters.")]
     public string Password { get; set; } = "";
 }
 
@@ -133,7 +140,7 @@ public class UserLoginDto
 
 
 
-// =============================Keep the code below ============================
+// ========================== Keep the code below ===================================
 // using System;
 // using System.IdentityModel.Tokens.Jwt;
 // using System.Linq;
@@ -142,9 +149,8 @@ public class UserLoginDto
 // using BookApi.Data;
 // using BookApi.Models;
 // using Microsoft.AspNetCore.Mvc;
-// using Microsoft.AspNetCore.RateLimiting;
 // using Microsoft.IdentityModel.Tokens;
-// using Microsoft.EntityFrameworkCore; // Added for DbUpdateException handling
+// using Microsoft.EntityFrameworkCore;
 // using Microsoft.Extensions.Configuration;
 //
 // namespace BookApi.Controllers;
@@ -156,8 +162,6 @@ public class UserLoginDto
 //     private readonly AppDbContext _db;
 //     private readonly IConfiguration _configuration;
 //
-//     // Dummy hash for non-existent users (BCrypt with work factor 12, password = "dummy-password-123")
-//     // This ensures BCrypt.Verify is always called, eliminating timing differences.
 //     private const string DummyPasswordHash = "$2a$12$Fg9jQ4ZQ5YxLmNpRtVwYuXeFgHjKlQwErTyUiOpAsDfGhJkLzXcVbNm";
 //
 //     public AuthController(AppDbContext db, IConfiguration configuration)
@@ -167,17 +171,14 @@ public class UserLoginDto
 //     }
 //
 //     [HttpPost("register")]
-//     [EnableRateLimiting("RegisterPolicy")]
 //     public IActionResult Register(UserRegisterDto dto)
 //     {
-//         // FIX: Return generic error for any model validation failure to prevent username enumeration.
 //         if (!ModelState.IsValid)
-//             return BadRequest("Unable to register. Please check your input.");
+//             return BadRequest(new { message = "Unable to register. Please check your input." });
 //
-//         // FIX: Instead of early return that distinguishes "username exists", use a generic message.
 //         if (_db.Users.Any(u => u.Username == dto.Username))
 //         {
-//             return BadRequest("Unable to register. Please check your input.");
+//             return BadRequest(new { message = "Unable to register. Please check your input." });
 //         }
 //
 //         var user = new User
@@ -193,54 +194,36 @@ public class UserLoginDto
 //         }
 //         catch (DbUpdateException)
 //         {
-//             // FIX: Catch unique constraint violations (e.g., concurrent registration) and return generic error.
-//             return BadRequest("Unable to register. Please check your input.");
+//             return BadRequest(new { message = "Unable to register. Please check your input." });
 //         }
 //
-//         return Ok("User created successfully.");
+//         // FIX: Return JSON instead of plain text so Angular HttpClient can parse it correctly.
+//         // Without this, Angular's default JSON parser would throw SyntaxError and enter error callback.
+//         return Ok(new { message = "User created successfully." });
 //     }
 //
 //     [HttpPost("login")]
-//     [EnableRateLimiting("LoginPolicy")]
 //     public IActionResult Login(UserLoginDto dto)
 //     {
 //         if (!ModelState.IsValid)
-//             return BadRequest(ModelState); // ModelState errors here are acceptable because login uses only username+password.
+//             return BadRequest(ModelState);
 //
-//         // Retrieve user if exists; we will use dummy hash otherwise.
 //         var user = _db.Users.FirstOrDefault(u => u.Username == dto.Username);
 //         string passwordHashToVerify;
 //
 //         if (user != null)
-//         {
 //             passwordHashToVerify = user.PasswordHash;
-//         }
 //         else
-//         {
-//             // FIX: Use a constant dummy hash to ensure BCrypt verification always runs,
-//             // eliminating timing side‑channel from the database query.
 //             passwordHashToVerify = DummyPasswordHash;
-//         }
 //
-//         // Always perform BCrypt verification, regardless of whether the user exists.
 //         bool isValid = BCrypt.Net.BCrypt.Verify(dto.Password, passwordHashToVerify);
 //
 //         if (!isValid)
-//         {
-//             // Generic error message for both wrong username and password.
-//             return Unauthorized("Invalid username or password.");
-//         }
+//             return Unauthorized(new { message = "Invalid username or password." });
 //
-//         // If user does not exist, isValid will always be false due to dummy hash.
-//         // Therefore we only continue when user exists and password is correct.
 //         if (user == null)
-//         {
-//             // This line is never reached because isValid is false for non‑existent users,
-//             // but we keep it for defensive programming.
-//             return Unauthorized("Invalid username or password.");
-//         }
+//             return Unauthorized(new { message = "Invalid username or password." });
 //
-//         // Generate JWT token (unchanged)
 //         var jwtSecret = _configuration["JWT_SECRET"];
 //         if (string.IsNullOrEmpty(jwtSecret))
 //             throw new Exception("JWT_SECRET is not configured.");
@@ -266,7 +249,7 @@ public class UserLoginDto
 //     }
 // }
 //
-// // DTOs remain unchanged
+// // DTOs unchanged
 // public class UserRegisterDto
 // {
 //     [System.ComponentModel.DataAnnotations.Required]
@@ -288,6 +271,9 @@ public class UserLoginDto
 //     [System.ComponentModel.DataAnnotations.Required]
 //     public string Password { get; set; } = "";
 // }
+
+
+
 
 
 
