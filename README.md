@@ -1,0 +1,6 @@
+
+##Environtment variables
+
+JWT_SECRET= YOUR_JWT_SECRET
+ConnectionStrings_BookQuote=YOUR_NEON_DATABASE_CONNECTION_STRING
+
